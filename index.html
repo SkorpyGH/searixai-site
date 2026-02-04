@@ -1,1 +1,568 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SearixAI — Будущее наступает локально</title>
+
+  <!-- Tailwind CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- GSAP -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+
+  <style>
+    :root{
+      --glass: rgba(255,255,255,0.06);
+      --border: rgba(255,255,255,0.12);
+    }
+
+    /* Strict monochrome base */
+    html, body { background: #000000; }
+
+    /* Canvas background */
+    #space{
+      position: fixed;
+      inset: 0;
+      z-index: -4;
+    }
+
+    /* Ultra-subtle fog (monochrome dust) */
+    #fog{
+      position: fixed;
+      inset: 0;
+      z-index: -3;
+      pointer-events: none;
+      background:
+        radial-gradient(900px 520px at 58% 48%, rgba(255,255,255,0.07), transparent 66%),
+        radial-gradient(820px 480px at 42% 55%, rgba(255,255,255,0.055), transparent 68%),
+        radial-gradient(1200px 720px at 50% 52%, rgba(255,255,255,0.04), transparent 74%);
+      filter: blur(0.7px);
+      opacity: 1;
+      transform: rotate(-12deg) scale(1.03);
+    }
+
+    /* Subtle grain */
+    #grain{
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0.10;
+      mix-blend-mode: overlay;
+      background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="260" height="260"><filter id="n"><feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="3" stitchTiles="stitch"/></filter><rect width="260" height="260" filter="url(%23n)" opacity="0.35"/></svg>');
+      background-size: 260px 260px;
+    }
+
+    /* Intro blur glass */
+    .intro-glass{
+      background: rgba(0,0,0,0.35);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    /* Glass */
+    .glass{
+      background: var(--glass);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    /* Soft white glow only */
+    .soft-glow{
+      box-shadow:
+        0 0 20px rgba(255,255,255,0.10),
+        0 0 64px rgba(255,255,255,0.05);
+    }
+
+    @keyframes pulseSoft {
+      0%, 100% {
+        box-shadow:
+          0 0 18px rgba(255,255,255,0.10),
+          0 0 58px rgba(255,255,255,0.05);
+        transform: translateY(0);
+      }
+      50% {
+        box-shadow:
+          0 0 22px rgba(255,255,255,0.13),
+          0 0 74px rgba(255,255,255,0.06);
+        transform: translateY(-1px);
+      }
+    }
+    .pulse-soft{ animation: pulseSoft 1.9s ease-in-out infinite; }
+
+    @media (prefers-reduced-motion: reduce){
+      .pulse-soft{ animation: none; }
+    }
+
+    *{ -webkit-tap-highlight-color: transparent; }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['ui-sans-serif','system-ui','-apple-system','Segoe UI','Roboto','Ubuntu','Cantarell','Noto Sans','Arial','sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="min-h-screen bg-black text-white overflow-x-hidden">
+
+  <!-- Starfield canvas (Strict Monochrome) -->
+  <canvas id="space"></canvas>
+  <div id="fog"></div>
+  <div id="grain"></div>
+
+  <!-- INTRO OVERLAY -->
+  <section id="intro" class="fixed inset-0 z-40 intro-glass flex items-center justify-center">
+    <div class="w-full max-w-[920px] px-6">
+      <div class="text-center">
+
+        <h1 id="introTitle" class="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight leading-snug">
+          <span class="opacity-90">SearixAI</span>
+          <span class="block mt-2 bg-clip-text text-transparent" style="background-image: linear-gradient(90deg, rgba(255,255,255,0.92), rgba(255,255,255,0.78), rgba(255,255,255,0.92));">
+            Будущее наступает локально
+          </span>
+        </h1>
+
+        <p id="introHint" class="mt-7 text-sm sm:text-base text-white/70 leading-relaxed">
+          Персональный ассистент на базе Ollama.
+          Минимальная задержка, абсолютная приватность и автономность.
+          Никаких ограничений. Никаких следов.
+          Всё, что вам нужно — уже здесь.
+        </p>
+
+        <div class="mt-10 flex items-center justify-center">
+          <button id="enterBtn" class="pulse-soft soft-glow rounded-2xl px-6 py-3 sm:px-7 sm:py-3.5 text-sm sm:text-base font-medium border border-white/15 bg-white/5 hover:bg-white/7 transition will-change-transform">
+            Начать погружение
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN CONTENT -->
+  <main id="main" class="relative z-10 opacity-0 pointer-events-none">
+    <div class="mx-auto max-w-6xl px-5 sm:px-8 pt-16 sm:pt-20 pb-20">
+
+      <!-- Hero -->
+      <header class="flex flex-col items-center text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full glass soft-glow">
+          <span class="text-xs text-white/75">Local-first assistant</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full bg-white/5 border border-white/10">Powered by Ollama</span>
+        </div>
+
+        <h2 class="mt-7 text-5xl sm:text-6xl md:text-7xl font-semibold tracking-tight leading-[0.95]">
+          <span class="bg-clip-text text-transparent" style="background-image: linear-gradient(90deg, rgba(255,255,255,0.96), rgba(255,255,255,0.76), rgba(255,255,255,0.94));">
+            SearixAI
+          </span>
+        </h2>
+
+        <p class="mt-6 max-w-2xl text-base sm:text-lg text-white/70 leading-relaxed">
+          Ассистент, который живёт на вашем железе, а не в облаке.
+          Быстро отвечает, не оставляет следов и не зависит от серверов.
+          Это не «будущее где-то там» — это будущее, которое уже здесь.
+        </p>
+
+        <!-- Offline status hint (for the app concept) -->
+        <div class="mt-6 w-full max-w-md">
+          <div class="glass rounded-2xl px-4 py-3 border border-white/10 flex items-center justify-between soft-glow">
+            <div class="flex items-center gap-2 text-sm">
+              <span class="inline-flex items-center justify-center w-9 h-9 rounded-2xl bg-white/5 border border-white/10">
+                <!-- Wi-Fi off icon -->
+                <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M2.5 8.5C6.2 5.3 17.8 5.3 21.5 8.5" stroke="rgba(255,255,255,0.85)" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M5.7 12.2C8.2 10.1 15.8 10.1 18.3 12.2" stroke="rgba(255,255,255,0.75)" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M9.2 15.7C10.3 14.9 13.7 14.9 14.8 15.7" stroke="rgba(255,255,255,0.65)" stroke-width="1.5" stroke-linecap="round"/>
+                  <path d="M4 4l16 16" stroke="rgba(255,255,255,0.9)" stroke-width="1.6" stroke-linecap="round"/>
+                  <path d="M12 19.5h0" stroke="rgba(255,255,255,0.9)" stroke-width="5" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <div class="text-left">
+                <div class="text-white/85 font-medium leading-tight">100% Offline Mode</div>
+                <div class="text-xs text-white/55 leading-tight">Infinite Offline • нулевая зависимость от сети</div>
+              </div>
+            </div>
+            <span class="text-xs text-white/55">status</span>
+          </div>
+        </div>
+
+        <div class="mt-8 flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          <a href="#" class="glass soft-glow rounded-2xl px-5 py-3 text-sm font-medium border border-white/10 hover:border-white/20 transition">
+            Скачать APK
+          </a>
+          <a href="https://t.me/SearixAIbot" target="_blank" rel="noopener noreferrer" class="rounded-2xl px-5 py-3 text-sm font-medium border border-white/12 bg-white/5 hover:bg-white/7 transition soft-glow flex items-center justify-center gap-2">
+            <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/5 border border-white/10">
+              <!-- paper plane -->
+              <svg viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M21.8 3.2L10.5 14.5M21.8 3.2L14.8 21.5c-.2.6-1 .7-1.4.3l-3.9-3.9c-.2-.2-.3-.5-.2-.8l1.2-5.1M21.8 3.2L2.6 9.8c-.6.2-.7 1-.3 1.4l3.9 3.9c.2.2.5.3.8.2l5.1-1.2" stroke="rgba(255,255,255,0.85)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            Telegram Бот
+          </a>
+          <a href="#" class="rounded-2xl px-5 py-3 text-sm font-medium border border-white/10 hover:border-white/20 transition bg-white/5">
+            Веб-версия
+          </a>
+        </div>
+      </header>
+
+      <!-- Features -->
+      <section class="mt-14 sm:mt-16">
+        <div class="flex items-end justify-between gap-4">
+          <div>
+            <h3 class="text-xl sm:text-2xl font-semibold">Функции</h3>
+            <p class="mt-2 text-sm sm:text-base text-white/65">Нажимай на карточки — получишь краткое объяснение.</p>
+          </div>
+          <div class="hidden sm:block text-xs text-white/45">Tap-friendly • Android-ready</div>
+        </div>
+
+        <div class="mt-7 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow" data-title="Prompt Snippets (Кодовые заготовки)" data-desc="Забудь о длинных промптах. Используй горячие команды для мгновенного результата: ревью кода, документация, поиск багов — одной кнопкой." aria-label="Prompt Snippets">
+            <h4 class="text-lg font-semibold">Prompt Snippets</h4>
+            <p class="mt-2 text-sm text-white/65">Быстрые команды вместо простыней текста.</p>
+          </button>
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow" data-title="Zero-Trace Privacy (Абсолютная анонимность)" data-desc="Твои переписки принадлежат только тебе. Никаких облаков, никаких утечек: всё работает через локальный туннель — без серверов корпораций." aria-label="Zero-Trace Privacy">
+            <h4 class="text-lg font-semibold">Zero-Trace Privacy</h4>
+            <p class="mt-2 text-sm text-white/65">Никаких облаков. Никаких следов.</p>
+          </button>
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow" data-title="Multi-Model Engine (Мульти-движок)" data-desc="Меняй модели как патроны в обойме — подбирай идеальный интеллект под цель. Переключение между Llama 3 и Qwen2-VL — без перезапуска приложения." aria-label="Multi-Model Engine">
+            <h4 class="text-lg font-semibold">Multi-Model Engine</h4>
+            <p class="mt-2 text-sm text-white/65">Модель под задачу — мгновенно.</p>
+          </button>
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow" data-title="Smart File Bridge (Файловый мост)" data-desc="Работа с целыми проектами, а не с отдельными строчками. Прикрепляй папку и проси: «Проверь /src на уязвимости» — ассистент видит контекст проекта." aria-label="Smart File Bridge">
+            <h4 class="text-lg font-semibold">Smart File Bridge</h4>
+            <p class="mt-2 text-sm text-white/65">Папка → анализ → результат.</p>
+          </button>
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow" data-title="Action Agents (Агенты действия)" data-desc="Целая команда экспертов в одном приложении. Выбирай роль: Searix-Senior (строгий ревьюер), Searix-Student (объясняет просто), Searix-Architect (проектирует системы)." aria-label="Action Agents">
+            <h4 class="text-lg font-semibold">Action Agents</h4>
+            <p class="mt-2 text-sm text-white/65">Роли под любую задачу.</p>
+          </button>
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow" data-title="Self-Correction Loop (Цикл самопроверки)" data-desc="Двойной контроль качества. Когда ассистент пишет код, он прогоняет результат через вторую быструю модель (например, DeepSeek-Coder-1.5b), чтобы найти опечатки до выдачи ответа." aria-label="Self-Correction Loop">
+            <h4 class="text-lg font-semibold">Self-Correction Loop</h4>
+            <p class="mt-2 text-sm text-white/65">Код, который работает с первой попытки.</p>
+          </button>
+
+          <button class="feature glass rounded-3xl p-5 sm:p-6 text-left hover:border-white/20 transition soft-glow lg:col-span-3" data-title="Infinite Offline (Полная автономность)" data-desc="Интернет больше не нужен. Твой интеллект всегда под рукой — в самолёте, в лесу или в бункере. Нулевая зависимость от серверов: нейросеть живёт на твоём железе." aria-label="Infinite Offline">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h4 class="text-lg font-semibold">Infinite Offline</h4>
+                <p class="mt-2 text-sm text-white/65">100% автономность. Везде. Всегда.</p>
+              </div>
+              <div class="text-xs text-white/55 sm:text-right">
+                «Интернет больше не нужен»
+              </div>
+            </div>
+          </button>
+
+        </div>
+      </section>
+
+      <!-- Modal -->
+      <div id="modal" class="fixed inset-0 z-50 hidden items-end sm:items-center justify-center">
+        <div id="modalBackdrop" class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+        <div id="modalCard" class="relative w-full sm:max-w-lg mx-auto rounded-t-3xl sm:rounded-3xl glass p-6 sm:p-7 soft-glow">
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <h4 id="modalTitle" class="text-xl font-semibold">Title</h4>
+              <p id="modalDesc" class="mt-3 text-sm sm:text-base text-white/70 leading-relaxed">Desc</p>
+            </div>
+            <button id="modalClose" class="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 transition flex items-center justify-center" aria-label="Закрыть">
+              <svg viewBox="0 0 24 24" class="w-5 h-5" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M6 6l12 12M18 6L6 18" stroke="rgba(255,255,255,0.9)" stroke-width="1.6" stroke-linecap="round"/>
+              </svg>
+            </button>
+          </div>
+
+          <div class="mt-6 flex gap-3">
+            <button id="modalSecondary" class="w-full rounded-2xl px-5 py-3 text-sm font-medium border border-white/12 bg-white/5 hover:bg-white/7 transition soft-glow">
+              Закрыть
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <footer class="mt-16 sm:mt-20 text-center text-xs text-white/45">
+        <p>© <span id="year"></span> SearixAI • Локальная мощь без следов.</p>
+      </footer>
+
+    </div>
+  </main>
+
+  <script>
+    // ===== Strict Monochrome Starfield + Milky Way + Meteors =====
+    const canvas = document.getElementById('space');
+    const ctx = canvas.getContext('2d');
+
+    let W, H, stars = [], dust = [], meteors = [];
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+    function rand(min, max){ return Math.random() * (max - min) + min; }
+    function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+
+    function resize(){
+      W = canvas.width = Math.floor(window.innerWidth * DPR);
+      H = canvas.height = Math.floor(window.innerHeight * DPR);
+      canvas.style.width = window.innerWidth + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+
+      // Star density
+      const starCount = Math.floor((window.innerWidth * window.innerHeight) / 5000);
+      const dustCount = Math.floor((window.innerWidth * window.innerHeight) / 8500);
+
+      // Stars: different sizes/brightness + twinkle
+      stars = new Array(starCount).fill(0).map(() => {
+        const t = Math.random();
+        const r = (t < 0.84 ? rand(0.22, 0.85) : rand(0.85, 1.8)) * DPR;
+        const a = t < 0.85 ? rand(0.10, 0.52) : rand(0.20, 0.88);
+        return {
+          x: Math.random() * W,
+          y: Math.random() * H,
+          r,
+          a,
+          tw: rand(0.0025, 0.010),
+          ph: rand(0, Math.PI * 2),
+        };
+      });
+
+      // Milky Way dust: concentrated rotated band
+      const angle = -12 * Math.PI / 180;
+      const cx = W * 0.52;
+      const cy = H * 0.52;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      dust = new Array(dustCount).fill(0).map(() => {
+        const u = rand(-1, 1);
+        const v = rand(-1, 1);
+        const band = Math.exp(-Math.pow(v * 2.0, 2));
+        const xLocal = u * W * 0.62;
+        const yLocal = v * H * 0.24;
+        const x = cx + xLocal * cos - yLocal * sin;
+        const y = cy + xLocal * sin + yLocal * cos;
+        return {
+          x,
+          y,
+          r: rand(0.3, 1.5) * DPR,
+          a: rand(0.02, 0.10) * band,
+          tw: rand(0.0015, 0.0045),
+          ph: rand(0, Math.PI * 2),
+        };
+      }).filter(p => p.x >= -60 && p.x <= W + 60 && p.y >= -60 && p.y <= H + 60);
+
+      // Clear meteors on resize (keeps it clean)
+      meteors = [];
+    }
+
+    function spawnMeteor(){
+      // Rare meteor: diagonal, white line with fading tail
+      const fromLeft = Math.random() < 0.5;
+      const startX = fromLeft ? rand(-0.1 * W, 0.3 * W) : rand(0.7 * W, 1.1 * W);
+      const startY = rand(0.05 * H, 0.45 * H);
+
+      const dir = fromLeft ? 1 : -1;
+      const speed = rand(420, 680) * DPR; // px/s
+      const len = rand(120, 220) * DPR;
+      const angle = rand(18, 28) * Math.PI / 180; // downward
+
+      meteors.push({
+        x: startX,
+        y: startY,
+        vx: Math.cos(angle) * speed * dir,
+        vy: Math.sin(angle) * speed,
+        len,
+        life: 0,
+        ttl: rand(0.9, 1.3)
+      });
+    }
+
+    // Spawn meteors: ~15s + slight jitter
+    function scheduleMeteor(){
+      const base = 15000;
+      const jitter = rand(-2500, 2500);
+      setTimeout(() => {
+        spawnMeteor();
+        scheduleMeteor();
+      }, base + jitter);
+    }
+
+    let lastT = performance.now();
+    function draw(now){
+      const t = now * 0.001;
+      const dt = Math.min(0.033, (now - lastT) / 1000);
+      lastT = now;
+
+      ctx.clearRect(0,0,W,H);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0,0,W,H);
+
+      // Milky way dust (soft)
+      for(const p of dust){
+        const alpha = p.a + Math.sin(t * p.tw + p.ph) * 0.010;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${clamp(alpha, 0, 0.22)})`;
+        ctx.fill();
+      }
+
+      // Stars twinkle
+      for(const s of stars){
+        const alpha = s.a + Math.sin(t * s.tw + s.ph) * 0.18;
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255,255,255,${clamp(alpha, 0, 0.95)})`;
+        ctx.fill();
+      }
+
+      // Meteors
+      if(meteors.length){
+        ctx.save();
+        ctx.lineCap = 'round';
+        for(let i = meteors.length - 1; i >= 0; i--){
+          const m = meteors[i];
+          m.life += dt;
+          m.x += m.vx * dt;
+          m.y += m.vy * dt;
+
+          const p = clamp(m.life / m.ttl, 0, 1);
+          const headA = (1 - p) * 0.9;
+          const tailA = (1 - p) * 0.0;
+
+          // Tail direction opposite velocity
+          const vlen = Math.hypot(m.vx, m.vy) || 1;
+          const tx = (m.vx / vlen);
+          const ty = (m.vy / vlen);
+
+          const x2 = m.x - tx * m.len;
+          const y2 = m.y - ty * m.len;
+
+          const grad = ctx.createLinearGradient(m.x, m.y, x2, y2);
+          grad.addColorStop(0, `rgba(255,255,255,${headA})`);
+          grad.addColorStop(1, `rgba(255,255,255,${tailA})`);
+
+          ctx.strokeStyle = grad;
+          ctx.lineWidth = 1.6 * DPR;
+          ctx.beginPath();
+          ctx.moveTo(m.x, m.y);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+
+          // remove when out or expired
+          if(m.life >= m.ttl || m.x < -0.3*W || m.x > 1.3*W || m.y > 1.3*H){
+            meteors.splice(i, 1);
+          }
+        }
+        ctx.restore();
+      }
+
+      requestAnimationFrame(draw);
+    }
+
+    window.addEventListener('resize', resize);
+    resize();
+    scheduleMeteor();
+    requestAnimationFrame(draw);
+
+    // ===== Intro focus effect =====
+    const intro = document.getElementById('intro');
+    const introTitle = document.getElementById('introTitle');
+    const introHint = document.getElementById('introHint');
+    const enterBtn = document.getElementById('enterBtn');
+    const main = document.getElementById('main');
+
+    // initial blur
+    introTitle.style.filter = 'blur(18px)';
+    introTitle.style.opacity = '0';
+    introHint.style.opacity = '0';
+    enterBtn.style.opacity = '0';
+
+    const tlIntro = gsap.timeline({ defaults: { ease: 'power3.out' } });
+    tlIntro
+      .to(introTitle, { duration: 0.9, opacity: 1, y: 0 }, 0)
+      .to(introTitle, { duration: 2.35, filter: 'blur(0px)' }, 0.18)
+      .to(introHint, { duration: 0.95, opacity: 1, y: 0 }, 1.05)
+      .to(enterBtn, { duration: 0.85, opacity: 1, y: 0 }, 1.35);
+
+    function openMain(){
+      // Blur overlay fades out over 2 seconds and then disappears
+      const tl = gsap.timeline({ defaults: { ease: 'power2.out' } });
+      tl.to(intro, { duration: 2.0, opacity: 0 })
+        .set(intro, { display: 'none' })
+        .set(main, { pointerEvents: 'auto' }, '<')
+        .to(main, { duration: 0.9, opacity: 1 }, '-=0.6');
+
+      gsap.fromTo(
+        'header > *',
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.9, stagger: 0.08, delay: 0.10, ease: 'power2.out' }
+      );
+      gsap.fromTo(
+        '.feature',
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.75, stagger: 0.08, delay: 0.35, ease: 'power2.out' }
+      );
+    }
+
+    enterBtn.addEventListener('click', openMain);
+
+    // ===== Feature modal =====
+    const modal = document.getElementById('modal');
+    const modalBackdrop = document.getElementById('modalBackdrop');
+    const modalCard = document.getElementById('modalCard');
+    const modalTitle = document.getElementById('modalTitle');
+    const modalDesc = document.getElementById('modalDesc');
+    const modalClose = document.getElementById('modalClose');
+    const modalSecondary = document.getElementById('modalSecondary');
+
+    function showModal(title, desc){
+      modalTitle.textContent = title;
+      modalDesc.textContent = desc;
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+
+      gsap.fromTo(modalBackdrop, { opacity: 0 }, { opacity: 1, duration: 0.25, ease: 'power2.out' });
+      gsap.fromTo(modalCard, { y: 18, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: 'power2.out' });
+    }
+
+    function hideModal(){
+      gsap.to(modalCard, { y: 14, opacity: 0, duration: 0.25, ease: 'power2.in' });
+      gsap.to(modalBackdrop, {
+        opacity: 0,
+        duration: 0.25,
+        ease: 'power2.in',
+        onComplete: () => {
+          modal.classList.add('hidden');
+          modal.classList.remove('flex');
+        }
+      });
+    }
+
+    document.querySelectorAll('.feature').forEach(btn => {
+      btn.addEventListener('click', () => showModal(btn.dataset.title, btn.dataset.desc));
+    });
+
+    modalBackdrop.addEventListener('click', hideModal);
+    modalClose.addEventListener('click', hideModal);
+    modalSecondary.addEventListener('click', hideModal);
+
+    window.addEventListener('keydown', (e) => {
+      if(e.key === 'Escape' && !modal.classList.contains('hidden')) hideModal();
+    });
+
+    document.getElementById('year').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
 
